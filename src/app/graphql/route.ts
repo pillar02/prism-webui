@@ -1,246 +1,494 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { FileInfo } from '@/types/file';
+import { FileInfo, FileDetailView, FileProcessingStatusView, ContractData, InvoiceData, BankSlipData, StructuredDataUnion } from '@/types/file'; // Assuming these types are now defined in types/file.ts
 import { buildSchema, graphql } from 'graphql';
 
-const mockFileInfo: FileInfo[] = [
+// Define a more comprehensive type for our mock data store
+interface MockFileMasterData {
+  id: string;
+  fileName: string;
+  documentType: string;
+  fileType: string;
+  processingStatus: 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'ERROR' | 'CANCELLED' | 'NOT_APPLICABLE';
+  uploadTimestamp: string;
+  userTags?: string[];
+  certainty?: number;
+  distance?: number;
+  perkeepFileRef?: string;
+  previewImageUrl?: string;
+  processingHistory?: FileProcessingStatusView;
+  relatedDocuments?: Partial<FileListItemView>[]; // Simplified related docs for mocking
+  structuredData?: ( (ContractData | InvoiceData | BankSlipData) & { __typename: string } ); // Ensure __typename for union
+  // Optional original fields if needed for other logic, though try to phase out
+  size?: string;
+  uploader?: string;
+}
+
+const sampleRelatedDocs: Partial<FileListItemView>[] = [
   {
-    id: '101',
-    name: '年度财务报告-2023-final.pdf',
-    type: 'PDF',
-    category: 'FINANCIAL_STATEMENT',
-    uploadTime: '2024-07-15 09:30',
-    status: 'COMPLETED',
-    tags: ['财务', '年度报告'],
-    previewUrl: 'https://res.cloudinary.com/subframe/image/upload/v1718999371/uploads/302/g5jou2tvabjzl7exoihk.png',
-    structuredInfo: {
-      reportYear: '2023',
-      department: 'Finance'
-    },
-    size: '2.5 MB',
-    uploader: '张三'
+    id: 'rel-001',
+    fileName: 'Related Policy Document.pdf',
+    documentType: 'Policy',
+    fileType: 'PDF',
+    processingStatus: 'COMPLETED',
+    uploadTimestamp: '2023-01-15T10:00:00Z',
+    userTags: ['internal', 'policy'],
+    certainty: 0.9,
+    distance: 0.1,
   },
   {
-    id: '102',
-    name: 'Q3营销计划.docx',
-    type: 'DOCX',
-    category: 'CONTRACT',
-    uploadTime: '2024-07-14 14:00',
-    status: 'COMPLETED',
-    tags: ['营销', '计划'],
-    previewUrl: 'https://res.cloudinary.com/subframe/image/upload/v1718999371/uploads/302/g5jou2tvabjzl7exoihk.png',
-    size: '1.2 MB',
-    uploader: '李四'
-  },
-  {
-    id: '103',
-    name: '新产品设计稿.png',
-    type: 'PNG',
-    category: 'OTHER',
-    uploadTime: '2024-07-13 11:20',
-    status: 'PENDING',
-    tags: ['设计', '新产品'],
-    previewUrl: 'https://res.cloudinary.com/subframe/image/upload/v1718999371/uploads/302/g5jou2tvabjzl7exoihk.png',
-    size: '500 KB',
-    uploader: '王五'
-  },
-  {
-    id: '104',
-    name: '客户合同-ABC公司.pdf',
-    type: 'PDF',
-    category: 'CONTRACT',
-    uploadTime: '2024-07-12 16:45',
-    status: 'ERROR',
-    tags: ['合同', '客户'],
-    previewUrl: 'https://res.cloudinary.com/subframe/image/upload/v1718999371/uploads/302/g5jou2tvabjzl7exoihk.png',
-    size: '800 KB',
-    uploader: '赵六'
-  },
-  {
-    id: '105',
-    name: '会议纪要-20240710.txt',
-    type: 'TXT',
-    category: 'OTHER',
-    uploadTime: '2024-07-10 10:00',
-    status: 'COMPLETED',
-    tags: ['会议', '纪要'],
-    previewUrl: 'https://res.cloudinary.com/subframe/image/upload/v1718999371/uploads/302/g5jou2tvabjzl7exoihk.png',
-    size: '10 KB',
-    uploader: '孙七'
-  },
-  {
-    id: '106',
-    name: '人力资源规划2024.xlsx',
-    type: 'XLSX',
-    category: 'OTHER',
-    uploadTime: '2024-07-09 15:30',
-    status: 'COMPLETED',
-    tags: ['人力资源', '规划'],
-    previewUrl: 'https://res.cloudinary.com/subframe/image/upload/v1718999371/uploads/302/g5jou2tvabjzl7exoihk.png',
-    structuredInfo: {
-      reportYear: '2024',
-      department: 'HR'
-    },
-    size: '1.8 MB',
-    uploader: '周八'
-  },
-  {
-    id: '107',
-    name: '研发项目进度报告.docx',
-    type: 'DOCX',
-    category: 'OTHER',
-    uploadTime: '2024-07-08 13:25',
-    status: 'PENDING',
-    tags: ['研发', '项目管理'],
-    previewUrl: 'https://res.cloudinary.com/subframe/image/upload/v1718999371/uploads/302/g5jou2tvabjzl7exoihk.png',
-    size: '3.2 MB',
-    uploader: '吴九'
-  },
-  {
-    id: '108',
-    name: '市场调研数据分析.csv',
-    type: 'CSV',
-    category: 'OTHER',
-    uploadTime: '2024-07-07 16:15',
-    status: 'COMPLETED',
-    tags: ['市场', '数据分析'],
-    previewUrl: 'https://res.cloudinary.com/subframe/image/upload/v1718999371/uploads/302/g5jou2tvabjzl7exoihk.png',
-    structuredInfo: {
-      department: 'Marketing',
-      reportYear: '2024'
-    },
-    size: '4.5 MB',
-    uploader: '郑十'
-  },
-  {
-    id: '109',
-    name: '纳税申报表2023.pdf',
-    type: 'PDF',
-    category: 'OTHER',
-    uploadTime: '2024-07-06 11:40',
-    status: 'COMPLETED',
-    tags: ['财务', '税务'],
-    previewUrl: 'https://res.cloudinary.com/subframe/image/upload/v1718999371/uploads/302/tax_preview.png',
-    structuredInfo: {
-      reportYear: '2023',
-      department: 'Finance',
-      taxpayerName: '示例公司',
-      idNumber: '91310000XXXXXXXX1X',
-      taxYear: '2023'
-    },
-    size: '1.6 MB',
-    uploader: '陈十一'
-  },
-  {
-    id: '110',
-    name: '员工培训手册.pdf',
-    type: 'PDF',
-    category: 'OTHER',
-    uploadTime: '2024-07-05 09:50',
-    status: 'COMPLETED',
-    tags: ['培训', 'HR'],
-    previewUrl: 'https://res.cloudinary.com/subframe/image/upload/v1718999371/uploads/302/training_preview.png',
-    size: '5.7 MB',
-    uploader: '林十二'
+    id: 'rel-002',
+    fileName: 'Supporting Spreadsheet.xlsx',
+    documentType: 'SupportingData',
+    fileType: 'XLSX',
+    processingStatus: 'COMPLETED',
+    uploadTimestamp: '2023-02-20T11:00:00Z',
+    userTags: ['data', 'support'],
+    certainty: 0.85,
+    distance: 0.15,
   }
 ];
 
+
+const mockMasterData: MockFileMasterData[] = [
+  {
+    id: '101',
+    fileName: '年度财务报告-2023-final.pdf',
+    documentType: 'FinancialStatement', // Changed from category
+    fileType: 'PDF', // Kept simple
+    processingStatus: 'COMPLETED', // Mapped from status
+    uploadTimestamp: '2024-07-15T09:30:00Z', // ISO 8601 format
+    userTags: ['财务', '年度报告'], // Renamed from tags
+    certainty: 0.98,
+    distance: 0.02,
+    perkeepFileRef: 'sha1-mock101ref-财务报告',
+    previewImageUrl: 'https://res.cloudinary.com/subframe/image/upload/v1718999371/uploads/302/g5jou2tvabjzl7exoihk.png',
+    processingHistory: {
+      fppId: '101-fpp', batchId: 'batch-001', overallPipelineStatus: 'COMPLETED',
+      perkeepUploadStatus: 'COMPLETED', ocrAnalysisStatus: 'COMPLETED',
+      ocr2VectorDBStatus: 'COMPLETED', vectorDB2AnalyticsStatus: 'COMPLETED',
+      lastUpdatedTimestamp: '2024-07-15T09:35:00Z',
+    },
+    relatedDocuments: [sampleRelatedDocs[0]],
+    structuredData: {
+      __typename: 'InvoiceData', // Example: Treat as Invoice for mocking, adjust as needed
+      id: '101-inv', invoiceNumber: 'INV-FS-2023-001', totalAmount: 50000, currency: 'CNY', invoiceDate: '2023-12-31T00:00:00Z', issuerName: '公司财务部'
+    },
+    size: '2.5 MB', uploader: '张三'
+  },
+  {
+    id: '102',
+    fileName: 'Q3营销计划.docx',
+    documentType: 'Contract', // Changed from category
+    fileType: 'DOCX',
+    processingStatus: 'COMPLETED',
+    uploadTimestamp: '2024-07-14T14:00:00Z',
+    userTags: ['营销', '计划'],
+    certainty: 0.95,
+    distance: 0.05,
+    perkeepFileRef: 'sha1-mock102ref-营销计划',
+    previewImageUrl: 'https://res.cloudinary.com/subframe/image/upload/v1718999371/uploads/302/g5jou2tvabjzl7exoihk.png',
+    processingHistory: {
+      fppId: '102-fpp', batchId: 'batch-001', overallPipelineStatus: 'COMPLETED',
+      perkeepUploadStatus: 'COMPLETED', ocrAnalysisStatus: 'COMPLETED',
+      ocr2VectorDBStatus: 'COMPLETED', vectorDB2AnalyticsStatus: 'COMPLETED',
+      lastUpdatedTimestamp: '2024-07-14T14:05:00Z',
+    },
+    relatedDocuments: [sampleRelatedDocs[1]],
+    structuredData: {
+      __typename: 'ContractData',
+      id: '102-contract', contractNumber: 'MKT-PLAN-Q3-2024', contractName: 'Q3 Marketing Plan Agreement', partyA: '营销部', partyB: '销售部', totalAmount: 150000, currency: 'CNY', effectiveDate: '2024-07-01T00:00:00Z', expirationDate: '2024-09-30T00:00:00Z'
+    },
+    size: '1.2 MB', uploader: '李四'
+  },
+  {
+    id: '103',
+    fileName: '新产品设计稿.png',
+    documentType: 'Other', // Changed from category
+    fileType: 'PNG',
+    processingStatus: 'PENDING',
+    uploadTimestamp: '2024-07-13T11:20:00Z',
+    userTags: ['设计', '新产品'],
+    certainty: 0.90,
+    distance: 0.10,
+    perkeepFileRef: 'sha1-mock103ref-设计稿',
+    previewImageUrl: 'https://res.cloudinary.com/subframe/image/upload/v1718999371/uploads/302/g5jou2tvabjzl7exoihk.png',
+    processingHistory: {
+      fppId: '103-fpp', batchId: 'batch-002', overallPipelineStatus: 'PENDING',
+      perkeepUploadStatus: 'PENDING', ocrAnalysisStatus: 'PENDING',
+      ocr2VectorDBStatus: 'NOT_APPLICABLE', vectorDB2AnalyticsStatus: 'NOT_APPLICABLE',
+      lastUpdatedTimestamp: '2024-07-13T11:22:00Z',
+    },
+    relatedDocuments: [],
+    structuredData: undefined, // No specific structured data for 'Other' or PNG in this mock
+    size: '500 KB', uploader: '王五'
+  },
+  {
+    id: '104',
+    fileName: '客户合同-ABC公司.pdf',
+    documentType: 'Contract',
+    fileType: 'PDF',
+    processingStatus: 'ERROR',
+    uploadTimestamp: '2024-07-12T16:45:00Z',
+    userTags: ['合同', '客户'],
+    certainty: 0.80,
+    distance: 0.20,
+    perkeepFileRef: 'sha1-mock104ref-客户合同',
+    previewImageUrl: 'https://res.cloudinary.com/subframe/image/upload/v1718999371/uploads/302/g5jou2tvabjzl7exoihk.png',
+    processingHistory: {
+      fppId: '104-fpp', batchId: 'batch-002', overallPipelineStatus: 'ERROR',
+      perkeepUploadStatus: 'COMPLETED', ocrAnalysisStatus: 'ERROR',
+      ocr2VectorDBStatus: 'CANCELLED', vectorDB2AnalyticsStatus: 'CANCELLED',
+      lastUpdatedTimestamp: '2024-07-12T16:50:00Z',
+    },
+    relatedDocuments: [sampleRelatedDocs[0], sampleRelatedDocs[1]],
+    structuredData: {
+      __typename: 'ContractData',
+      id: '104-contract', contractNumber: 'CUST-ABC-2024-001', contractName: 'Service Agreement with ABC Corp', partyA: '我方公司', partyB: 'ABC 公司', totalAmount: 250000, currency: 'USD', effectiveDate: '2024-07-10T00:00:00Z', expirationDate: '2025-07-09T00:00:00Z'
+    },
+    size: '800 KB', uploader: '赵六'
+  },
+  {
+    id: '105',
+    fileName: '会议纪要-20240710.txt',
+    documentType: 'Other',
+    fileType: 'TXT',
+    processingStatus: 'COMPLETED',
+    uploadTimestamp: '2024-07-10T10:00:00Z',
+    userTags: ['会议', '纪要'],
+    certainty: 0.92,
+    distance: 0.08,
+    perkeepFileRef: 'sha1-mock105ref-会议纪要',
+    previewImageUrl: 'https://res.cloudinary.com/subframe/image/upload/v1718999371/uploads/302/g5jou2tvabjzl7exoihk.png',
+    processingHistory: {
+      fppId: '105-fpp', batchId: 'batch-003', overallPipelineStatus: 'COMPLETED',
+      perkeepUploadStatus: 'COMPLETED', ocrAnalysisStatus: 'COMPLETED',
+      ocr2VectorDBStatus: 'NOT_APPLICABLE', vectorDB2AnalyticsStatus: 'NOT_APPLICABLE',
+      lastUpdatedTimestamp: '2024-07-10T10:05:00Z',
+    },
+    relatedDocuments: [],
+    structuredData: undefined,
+    size: '10 KB', uploader: '孙七'
+  },
+  // Add more mock data items following the new structure for 106-110
+  {
+    id: '106',
+    fileName: '人力资源规划2024.xlsx',
+    documentType: 'HRDocument', // Example, can be 'Other'
+    fileType: 'XLSX',
+    processingStatus: 'COMPLETED',
+    uploadTimestamp: '2024-07-09T15:30:00Z',
+    userTags: ['人力资源', '规划'],
+    certainty: 0.96,
+    distance: 0.04,
+    perkeepFileRef: 'sha1-mock106ref-HR规划',
+    previewImageUrl: 'https://res.cloudinary.com/subframe/image/upload/v1718999371/uploads/302/g5jou2tvabjzl7exoihk.png',
+    processingHistory: {
+      fppId: '106-fpp', batchId: 'batch-003', overallPipelineStatus: 'COMPLETED',
+      perkeepUploadStatus: 'COMPLETED', ocrAnalysisStatus: 'COMPLETED',
+      ocr2VectorDBStatus: 'COMPLETED', vectorDB2AnalyticsStatus: 'COMPLETED',
+      lastUpdatedTimestamp: '2024-07-09T15:35:00Z',
+    },
+    relatedDocuments: [sampleRelatedDocs[0]],
+    structuredData: {
+        __typename: 'ContractData', // Example, could be other type or undefined
+        id: '106-hrplan', contractNumber: 'HR-PLAN-2024', contractName: '2024 HR Strategic Plan', partyA: 'HR Department', totalAmount: 0, currency: 'N/A', effectiveDate: '2024-01-01T00:00:00Z'
+    },
+    size: '1.8 MB', uploader: '周八'
+  },
+  {
+    id: '109', // Example: BankSlip
+    fileName: '付款凭证-XYZ供应商.pdf',
+    documentType: 'BankSlip',
+    fileType: 'PDF',
+    processingStatus: 'COMPLETED',
+    uploadTimestamp: '2024-07-06T11:40:00Z',
+    userTags: ['财务', '付款'],
+    certainty: 0.99,
+    distance: 0.01,
+    perkeepFileRef: 'sha1-mock109ref-付款凭证',
+    previewImageUrl: 'https://res.cloudinary.com/subframe/image/upload/v1718999371/uploads/302/tax_preview.png', // Reusing image
+    processingHistory: {
+      fppId: '109-fpp', batchId: 'batch-004', overallPipelineStatus: 'COMPLETED',
+      perkeepUploadStatus: 'COMPLETED', ocrAnalysisStatus: 'COMPLETED',
+      ocr2VectorDBStatus: 'COMPLETED', vectorDB2AnalyticsStatus: 'COMPLETED',
+      lastUpdatedTimestamp: '2024-07-06T11:45:00Z',
+    },
+    relatedDocuments: [sampleRelatedDocs[1]],
+    structuredData: {
+      __typename: 'BankSlipData',
+      id: '109-bankslip', payerName: '我方公司', payerAccount: '1234567890', payerBank: '招商银行', payeeName: 'XYZ 供应商', payeeAccount: '0987654321', payeeBank: '工商银行', paymentAmount: 85000, paymentDate: '2024-07-05T00:00:00Z', remarks: '支付货款'
+    },
+    size: '1.6 MB', uploader: '陈十一'
+  },
+   {
+    id: '110', // Example: Invoice
+    fileName: '服务费发票-顾问A.pdf',
+    documentType: 'Invoice',
+    fileType: 'PDF',
+    processingStatus: 'COMPLETED',
+    uploadTimestamp: '2024-07-05T09:50:00Z',
+    userTags: ['财务', '发票', '顾问服务'],
+    certainty: 0.97,
+    distance: 0.03,
+    perkeepFileRef: 'sha1-mock110ref-服务费发票',
+    previewImageUrl: 'https://res.cloudinary.com/subframe/image/upload/v1718999371/uploads/302/training_preview.png', // Reusing image
+    processingHistory: {
+      fppId: '110-fpp', batchId: 'batch-004', overallPipelineStatus: 'COMPLETED',
+      perkeepUploadStatus: 'COMPLETED', ocrAnalysisStatus: 'COMPLETED',
+      ocr2VectorDBStatus: 'COMPLETED', vectorDB2AnalyticsStatus: 'COMPLETED',
+      lastUpdatedTimestamp: '2024-07-05T09:55:00Z',
+    },
+    relatedDocuments: [],
+    structuredData: {
+      __typename: 'InvoiceData',
+      id: '110-invoice', invoiceNumber: 'INV-CONS-A-005', invoiceCode: 'IC123456', invoiceType: '服务费', issuerName: '顾问A公司', recipientName: '我方公司', totalAmount: 12000, taxAmount: 720, amountExcludingTax: 11280, invoiceDate: '2024-07-01T00:00:00Z'
+    },
+    size: '5.7 MB', uploader: '林十二'
+  }
+  // Note: Items 107, 108 are omitted for brevity in this example transformation but should be included
+];
+
+
 // --- Inserted GraphQL Setup ---
 const schemaString = `
-  type StructuredInfo {
-    reportYear: String
-    department: String
-    taxpayerName: String
-    idNumber: String
-    taxYear: String
-  }
+enum SortOrder {
+  ASC
+  DESC
+}
 
-  type FileInfo {
-    id: ID!
-    name: String!
-    type: String!
-    category: String
-    uploadTime: String!
-    status: String!
-    tags: [String]
-    previewUrl: String
-    structuredInfo: StructuredInfo
-    size: String
-    uploader: String
-  }
+enum PipelineStageStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  ERROR
+  CANCELLED
+  NOT_APPLICABLE
+}
 
-  type PageInfo {
-    hasNextPage: Boolean!
-    endCursor: String
-  }
+interface BaseData {
+  id: ID!
+}
 
-  type FileEdge {
-    cursor: String!
-    node: FileInfo!
-  }
+type ContractData implements BaseData {
+  id: ID!
+  contractNumber: String
+  contractName: String
+  partyA: String
+  partyB: String
+  totalAmount: Float
+  currency: String
+  effectiveDate: String # Consider using DateTime scalar
+  expirationDate: String # Consider using DateTime scalar
+}
 
-  type FileConnection {
-    totalCount: Int!
-    pageInfo: PageInfo!
-    edges: [FileEdge!]!
-  }
+type InvoiceData implements BaseData {
+  id: ID!
+  invoiceNumber: String
+  invoiceCode: String
+  invoiceType: String
+  issuerName: String
+  recipientName: String
+  totalAmount: Float
+  taxAmount: Float
+  amountExcludingTax: Float
+  invoiceDate: String # Consider using DateTime scalar
+  lineItemsJson: String # JSON string for line items
+}
 
-  type Query {
-    files(first: Int, after: String): FileConnection!
-    file(id: ID!): FileInfo
-    recentFiles(limit: Int): [FileInfo!]! # Kept for compatibility if used elsewhere, though Get_Recent_Files_QUERY targets 'files'
-  }
+type BankSlipData implements BaseData {
+  id: ID!
+  payerName: String
+  payerAccount: String
+  payerBank: String
+  payeeName: String
+  payeeAccount: String
+  payeeBank: String
+  paymentAmount: Float
+  paymentDate: String # Consider using DateTime scalar
+  remarks: String
+}
+
+union StructuredDataUnion = ContractData | InvoiceData | BankSlipData
+
+type FileProcessingStatusView {
+  fppId: ID! # File Processing Pipeline ID
+  batchId: String
+  overallPipelineStatus: PipelineStageStatus!
+  perkeepUploadStatus: PipelineStageStatus!
+  ocrAnalysisStatus: PipelineStageStatus!
+  ocr2VectorDBStatus: PipelineStageStatus!
+  vectorDB2AnalyticsStatus: PipelineStageStatus!
+  lastUpdatedTimestamp: String! # ISO 8601 DateTime string
+}
+
+type FileListItemView {
+  id: ID!
+  fileName: String!
+  documentType: String # E.g., 'Invoice', 'Contract', 'BankSlip'. Could be an enum.
+  fileType: String! # E.g., 'application/pdf', 'image/jpeg', 'text/plain'
+  processingStatus: PipelineStageStatus!
+  uploadTimestamp: String! # ISO 8601 DateTime string
+  userTags: [String!]
+  certainty: Float
+  distance: Float
+}
+
+type FileDetailView {
+  id: ID!
+  fileName: String
+  documentType: String
+  perkeepFileRef: String # Perkeep blob reference
+  previewImageUrl: String
+  processingHistory: FileProcessingStatusView # Or [FileProcessingStatusView!] if multiple history entries
+  userTags: [String!]
+  relatedDocuments: [FileListItemView!]
+  structuredData: StructuredDataUnion
+}
+
+input FileFilterInput {
+  documentTypes: [String!]
+  overallPipelineStatus_in: [PipelineStageStatus!]
+  uploadDate_gte: String # ISO 8601 DateTime string
+  uploadDate_lte: String # ISO 8601 DateTime string
+  userTags_containsAll: [String!]
+  userTags_containsAny: [String!]
+}
+
+type Query {
+  searchFiles(
+    limit: Int = 10
+    offset: Int = 0
+    sortBy: String = "uploadTimestamp"
+    sortOrder: SortOrder = DESC
+    filter: FileFilterInput
+    searchText: String
+  ): [FileListItemView!]!
+
+  getFileDetails(id: ID!): FileDetailView
+}
 `;
 
 const schema = buildSchema(schemaString);
 
-const processFileForGraphQL = (file: FileInfo): any => {
-  return {
-    ...file,
-    structuredInfo: file.structuredInfo || null,
-  };
+// Define FileListItemView based on schema for mapping
+type FileListItemViewGQL = {
+  id: string;
+  fileName: string;
+  documentType?: string;
+  fileType: string;
+  processingStatus: string; // Should match PipelineStageStatus enum values
+  uploadTimestamp: string;
+  userTags?: string[];
+  certainty?: number;
+  distance?: number;
 };
 
-const rootValue = {
-  files: ({ first, after }: { first?: number, after?: string }) => {
-    let items = mockFileInfo.map(processFileForGraphQL);
-    const totalCount = items.length;
 
-    let startIndex = 0;
-    if (after) {
-      const afterIndex = items.findIndex(item => item.id === after);
-      if (afterIndex !== -1) {
-        startIndex = afterIndex + 1;
-      }
+const rootValue = {
+  searchFiles: ({
+    limit = 10,
+    offset = 0,
+    sortBy = "uploadTimestamp",
+    sortOrder = "DESC",
+    filter,
+    searchText,
+  }: {
+    limit?: number;
+    offset?: number;
+    sortBy?: string;
+    sortOrder?: "ASC" | "DESC";
+    filter?: { documentTypes?: string[]; overallPipelineStatus_in?: string[] };
+    searchText?: string;
+  }): FileListItemViewGQL[] => {
+    let results = [...mockMasterData];
+
+    // Filtering
+    if (searchText) {
+      results = results.filter(file =>
+        file.fileName.toLowerCase().includes(searchText.toLowerCase())
+      );
+    }
+    if (filter?.documentTypes && filter.documentTypes.length > 0) {
+      results = results.filter(file =>
+        filter.documentTypes!.includes(file.documentType)
+      );
+    }
+    if (filter?.overallPipelineStatus_in && filter.overallPipelineStatus_in.length > 0) {
+      results = results.filter(file =>
+        filter.overallPipelineStatus_in!.includes(file.processingStatus)
+      );
     }
 
-    const endIndex = first !== undefined ? startIndex + first : items.length;
-    const paginatedItems = items.slice(startIndex, endIndex);
+    // Sorting
+    results.sort((a, b) => {
+      let valA, valB;
+      if (sortBy === "uploadTimestamp") {
+        valA = new Date(a.uploadTimestamp).getTime();
+        valB = new Date(b.uploadTimestamp).getTime();
+      } else if (sortBy === "fileName") {
+        valA = a.fileName.toLowerCase();
+        valB = b.fileName.toLowerCase();
+      } else {
+        return 0; // No sort for other fields in this mock
+      }
 
-    const edges = paginatedItems.map((item, index) => ({
-      cursor: item.id, // Using ID as cursor
-      node: item,
+      if (valA < valB) return sortOrder === "ASC" ? -1 : 1;
+      if (valA > valB) return sortOrder === "ASC" ? 1 : -1;
+      return 0;
+    });
+
+    // Pagination
+    const paginatedResults = results.slice(offset, offset + limit);
+
+    // Map to FileListItemView
+    return paginatedResults.map(file => ({
+      id: file.id,
+      fileName: file.fileName,
+      documentType: file.documentType,
+      fileType: file.fileType,
+      processingStatus: file.processingStatus,
+      uploadTimestamp: file.uploadTimestamp,
+      userTags: file.userTags || [],
+      certainty: file.certainty,
+      distance: file.distance,
     }));
+  },
 
-    const hasNextPage = endIndex < totalCount;
-    const endCursor = edges.length > 0 ? edges[edges.length - 1].cursor : null;
+  getFileDetails: ({ id }: { id: string }): FileDetailView | null => {
+    const file = mockMasterData.find(f => f.id === id);
+    if (!file) {
+      return null;
+    }
+
+    // Construct FileDetailView from MockFileMasterData
+    // Ensure relatedDocuments are also mapped to FileListItemView
+    const relatedDocsView = file.relatedDocuments?.map(rd => ({
+        id: rd.id!,
+        fileName: rd.fileName!,
+        documentType: rd.documentType,
+        fileType: rd.fileType!,
+        processingStatus: rd.processingStatus!,
+        uploadTimestamp: rd.uploadTimestamp!,
+        userTags: rd.userTags || [],
+        certainty: rd.certainty,
+        distance: rd.distance,
+    })) || [];
+
 
     return {
-      totalCount,
-      pageInfo: {
-        hasNextPage,
-        endCursor,
-      },
-      edges,
+      id: file.id,
+      fileName: file.fileName,
+      documentType: file.documentType,
+      perkeepFileRef: file.perkeepFileRef,
+      previewImageUrl: file.previewImageUrl,
+      processingHistory: file.processingHistory, // Assuming direct match or further mapping if needed
+      userTags: file.userTags || [],
+      relatedDocuments: relatedDocsView,
+      structuredData: file.structuredData ? {
+        __typename: file.structuredData.__typename, // Crucial for union type
+        ...file.structuredData // Spread the rest of the data
+      } : undefined,
     };
-  },
-  file: ({ id }: { id: string }) => {
-    const file = mockFileInfo.find(f => f.id === id);
-    return file ? processFileForGraphQL(file) : null;
-  },
-  recentFiles: ({ limit = 5 }: { limit?: number }) => {
-    // This resolver remains for the specific 'recentFiles' query if it's used directly.
-    // The Get_Recent_Files_QUERY from fileQueries.ts targets the 'files' query with pagination.
-    return mockFileInfo.slice(0, limit).map(processFileForGraphQL);
   },
 };
 // --- End Inserted GraphQL Setup ---

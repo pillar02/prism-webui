@@ -24,7 +24,7 @@ import {
 } from '@subframe/core';
 import { Badge } from '@/ui/components/Badge';
 
-export const getFileIcon = (type: FileInfo['type']) => {
+export const getFileIcon = (type: FileInfo['fileType']) => { // Changed type to fileType
   switch (type) {
     case 'PDF':
     case 'DOCX':
@@ -39,7 +39,7 @@ export const getFileIcon = (type: FileInfo['type']) => {
   }
 };
 
-export const getStatusBadge = (status: FileInfo['status']) => {
+export const getStatusBadge = (status: FileInfo['processingStatus']) => { // Changed status to processingStatus
   switch (status) {
     case 'COMPLETED':
       return (
@@ -108,21 +108,21 @@ const FileList: React.FC<FileListProps> = ({ files, onView, onDownload }) => {
           <Table.Row key={file.id} className="hover:bg-brand-100 hover:scale-[1.01] transition-all duration-200 cursor-pointer">
             <Table.Cell>
               <div className="flex items-center gap-2">
-                {getFileIcon(file.type)}
+                {getFileIcon(file.fileType)}
                 <span className="whitespace-nowrap text-body-bold font-body-bold text-neutral-700">
-                  {file.name}
+                  {file.fileName}
                 </span>
               </div>
             </Table.Cell>
             <Table.Cell>
               <span className="whitespace-nowrap text-body font-body text-neutral-500">
-                {file.uploadTime}
+                {file.uploadTimestamp}
               </span>
             </Table.Cell>
-            <Table.Cell>{getStatusBadge(file.status)}</Table.Cell>
+            <Table.Cell>{getStatusBadge(file.processingStatus)}</Table.Cell>
             <Table.Cell>
               <div className="flex items-start gap-2">
-                {file.tags?.map((tag) => (
+                {file.userTags?.map((tag) => (
                   <Badge key={tag} className="rounded-sm" variant="neutral">
                     {tag}
                   </Badge>

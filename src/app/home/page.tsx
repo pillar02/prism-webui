@@ -18,16 +18,16 @@ import { FeatherAlertTriangle } from "@subframe/core";
 import FileUploadDialog from "@/components/common/FileUploadDialog";
 import FileList from "@/components/common/FileList";
 import ActivityCalendar, { type ThemeInput, type Activity } from 'react-activity-calendar';
-import { FileInfo } from '@/types/file';
+import { FileInfo } from '@/types/file'; // Assuming FileInfo will be updated or is flexible
 import { useQuery } from "@apollo/client";
-import { QUERY_RECENT_FILES } from '@/lib/graphql/file-queries';
+import { searchFiles } from '@/lib/graphql/file-queries'; // Changed import
 
 function Dashboard() {
   const numRecentFiles = 5
   const router = useRouter();
   const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
-  const { loading, error, data } = useQuery(QUERY_RECENT_FILES, {
-    variables: { first: numRecentFiles },
+  const { loading, error, data } = useQuery(searchFiles, { // Changed query
+    variables: { limit: numRecentFiles }, // Changed variable name
   });
   const [activityData, setActivityData] = useState<Activity[]>(() => {
     const today = new Date();
@@ -59,7 +59,7 @@ function Dashboard() {
     return data;
   });
 
-  const recentFilesToDisplay = data?.files?.edges?.map((edge: { node: FileInfo }) => edge.node) || [];
+  const recentFilesToDisplay = data?.searchFiles || []; // Adjusted data extraction
 
   const explicitTheme: ThemeInput = {
     light: [

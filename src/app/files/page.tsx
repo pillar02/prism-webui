@@ -18,16 +18,44 @@ import { Loader } from "@/ui/components/Loader";
 import FileUploadDialog from "@/components/common/FileUploadDialog";
 import FileList from "@/components/common/FileList";
 import { useQuery } from "@apollo/client";
-import { QUERY_RECENT_FILES } from '@/lib/graphql/file-queries';
-import { FileInfo } from '@/types/file';
+import { searchFiles } from '@/lib/graphql/file-queries'; // Changed import
+import { FileInfo } from '@/types/file'; // FileInfo is already updated
+
+// Define SortOrder type/enum if not available globally, for now using string literals
+// type SortOrder = "ASC" | "DESC";
+// Assuming FileFilterInput might be complex, using 'any' for now
+// interface FileFilterInput { /* ... structure ... */ }
+
 
 export default function FilesPage() {
   const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
-  const { loading, error, data } = useQuery(QUERY_RECENT_FILES, {
-    variables: { first: 10 },
+  const [searchText, setSearchText] = useState<string>("");
+  const [filter, setFilter] = useState<any | null>(null); // Replace 'any' with actual FileFilterInput if defined
+  const [sortBy, setSortBy] = useState<string>("uploadTimestamp");
+  const [sortOrder, setSortOrder] = useState<"ASC" | "DESC">("DESC");
+  const [limit, setLimit] = useState<number>(10);
+  const [offset, setOffset] = useState<number>(0);
+
+  const { loading, error, data, refetch } = useQuery(searchFiles, { // Changed query
+    variables: {
+      limit,
+      offset,
+      searchText,
+      filter,
+      sortBy,
+      sortOrder,
+    },
   });
 
-  const filesToDisplay = data?.files?.edges?.map((edge: { node: FileInfo }) => edge.node) || [];
+  const filesToDisplay = data?.searchFiles || []; // Adjusted data extraction
+
+  // TODO: Add functions to update filter, sortBy, sortOrder, limit, offset and call refetch()
+  // For example, for search text:
+  // const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  //   setSearchText(event.target.value);
+  //   // Consider debouncing refetch or calling it on submit
+  // };
+
   return (
     <DefaultPageLayout>
       <FileUploadDialog 
@@ -45,8 +73,12 @@ export default function FilesPage() {
           >
             <TextField.Input
               placeholder="Search files..."
-              value=""
-              onChange={(event: React.ChangeEvent<HTMLInputElement>) => {}}
+              value={searchText} // Bind to searchText state
+              onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
+                setSearchText(event.target.value);
+                // TODO: Decide on refetch strategy (e.g., on-the-fly, on-submit, debounced)
+                // For now, just updating state. A button or useEffect would trigger refetch.
+              }}
             />
           </TextField>
           <Button

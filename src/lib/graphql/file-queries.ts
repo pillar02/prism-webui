@@ -1,50 +1,86 @@
 import { gql } from '@apollo/client';
 
-export const QUERY_RECENT_FILES = gql`
-  query QueryRecentFiles(
-    $first: Int
+export const searchFiles = gql`
+  query searchFiles(
+    $limit: Int
+    $offset: Int
+    $sortBy: String
+    $sortOrder: SortOrder
+    $filter: FileFilterInput
+    $searchText: String
   ) {
-    files(first: $first) {
-      totalCount
-      pageInfo {
-        hasNextPage
-        endCursor
-      }
-      edges {
-        cursor
-        node {
-          id
-          name
-          type
-          uploadTime
-          status
-          tags
-        }
-      }
+    searchFiles(
+      limit: $limit
+      offset: $offset
+      sortBy: $sortBy
+      sortOrder: $sortOrder
+      filter: $filter
+      searchText: $searchText
+    ) {
+      id
+      fileName
+      documentType
+      fileType
+      processingStatus
+      uploadTimestamp
+      userTags
+      certainty
+      distance
     }
   }
 `;
 
-export const QUERY_FILE_DETAILS = gql`
-  query QueryFileDetails($id: ID!) {
+export const getFileDetails = gql`
+  query getFileDetails($id: ID!) {
     file(id: $id) {
       id
-      name
-      type
-      category
-      uploadTime
-      status
-      size
-      uploader
-      previewUrl
-      structuredInfo {
-        reportYear
-        department
-        taxpayerName
-        idNumber
-        taxYear
+      fileName
+      documentType
+      perkeepFileRef
+      previewImageUrl
+      processingHistory {
+        status
+        timestamp
+        workerName
+        errorMessage
       }
-      tags
+      userTags
+      relatedDocuments {
+        id
+        fileName
+        documentType
+        fileType
+        processingStatus
+        uploadTimestamp
+        userTags
+        certainty
+        distance
+      }
+      structuredData {
+        ... on ContractData {
+          contractId
+          contractType
+          effectiveDate
+          expirationDate
+          partyA
+          partyB
+        }
+        ... on InvoiceData {
+          invoiceNumber
+          invoiceDate
+          dueDate
+          totalAmount
+          vendorName
+          customerName
+        }
+        ... on BankSlipData {
+          slipId
+          paymentDate
+          amount
+          payerName
+          receiverName
+        }
+      }
     }
   }
 `;
