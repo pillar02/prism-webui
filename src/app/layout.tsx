@@ -1,8 +1,9 @@
 import "./globals.css";
 import type { Metadata } from "next";
+import { ApolloProviderWrapper } from "@/lib/apollo-provider";
 
 export const metadata: Metadata = {
-  title: "Subframe Next.js Starter",
+  title: "Prism",
   description: "Your starter kit for integrating Subframe into Next.js",
 };
 
@@ -27,7 +28,9 @@ export default function RootLayout({
         />
       </head>
 
-      <body>{children}</body>
+      <body>
+        <ApolloProviderWrapper>{children}</ApolloProviderWrapper>
+      </body>
     </html>
   );
 }
