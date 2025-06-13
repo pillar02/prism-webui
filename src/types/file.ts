@@ -1,17 +1,15 @@
-export interface FileInfo {
+// Renamed from FileInfo and properties updated to match GraphQL FileListItemView
+export interface FileListItemView {
   id: string;
-  fileName: string; // Renamed from name
-  fileType: 'PDF' | 'XLSX' | 'DOCX' | 'PNG' | 'TXT' | 'CSV' | 'FOLDER' | 'OTHER'; // Renamed from type
-  documentType: string; // Added, assuming string type for now
-  uploadTimestamp: string; // Renamed from uploadTime
-  processingStatus: 'COMPLETED' | 'PROCESSING' | 'ERROR' | 'PENDING'; // Renamed from status
-  userTags?: string[]; // Renamed from tags
-  certainty?: number; // Added
-  distance?: number; // Added
-  previewUrl?: string; // Kept, though not in FileListItemView, might be used by FilePreviewDialog
-  structuredInfo?: Record<string, any>; // Kept for similar reasons
-  size?: string; // Kept
-  uploader?: string; // Kept
+  fileName: string;
+  documentType?: string; // Changed to optional
+  fileType: string; // Changed from specific union to generic string
+  processingStatus: PipelineStageStatusType; // Uses the defined type
+  uploadTimestamp: string;
+  userTags?: string[];
+  certainty?: number;
+  distance?: number;
+  // previewUrl, structuredInfo, size, uploader REMOVED
 }
 
 export interface FilePreviewDialogProps {
@@ -34,6 +32,7 @@ export interface FileProcessingStatusView {
 
 // Represents structured data for a contract (ContractData from backend)
 export interface ContractData {
+  __typename?: 'ContractData';
   contractNumber?: string;
   contractName?: string;
   partyA?: string;
@@ -46,6 +45,7 @@ export interface ContractData {
 
 // Represents structured data for an invoice (InvoiceData from backend)
 export interface InvoiceData {
+  __typename?: 'InvoiceData';
   invoiceNumber?: string;
   invoiceCode?: string;
   invoiceType?: string;
@@ -60,6 +60,7 @@ export interface InvoiceData {
 
 // Represents structured data for a bank slip (BankSlipData from backend)
 export interface BankSlipData {
+  __typename?: 'BankSlipData';
   payerName?: string;
   payerAccount?: string;
   payerBank?: string;
@@ -74,15 +75,27 @@ export interface BankSlipData {
 // Union type for different kinds of structured data
 export type StructuredDataUnion = ContractData | InvoiceData | BankSlipData;
 
+// Type alias for possible processing status values, mirroring GraphQL enum
+export type PipelineStageStatusType =
+  | 'PENDING'
+  | 'PROCESSING'
+  | 'COMPLETED'
+  | 'ERROR'
+  | 'CANCELLED'
+  | 'NOT_APPLICABLE';
+
 // Represents the detailed view of a file (FileDetailView from backend)
 export interface FileDetailView {
   id: string;
   fileName?: string;
   documentType?: string; // e.g., 'CONTRACT', 'INVOICE'
+  fileType?: string; // Added this line
   perkeepFileRef?: string;
   previewImageUrl?: string;
   processingHistory?: FileProcessingStatusView; // Note: GraphQL query had this as an array, but instructions imply single object. Clarify if array needed. For now, single object.
   userTags?: string[];
-  relatedDocuments?: FileInfo[]; // Array of FileInfo for related documents
+  relatedDocuments?: FileListItemView[]; // Updated to use FileListItemView
   structuredData?: StructuredDataUnion;
+  uploadTimestamp: string; // Added
+  processingStatus: PipelineStageStatusType; // Added
 }

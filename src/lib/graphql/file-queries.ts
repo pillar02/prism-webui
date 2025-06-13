@@ -32,17 +32,24 @@ export const searchFiles = gql`
 
 export const getFileDetails = gql`
   query getFileDetails($id: ID!) {
-    file(id: $id) {
+    getFileDetails(id: $id) { # Changed root operation
       id
       fileName
       documentType
+      fileType # Added this line
+      uploadTimestamp # Added
+      processingStatus # Added
       perkeepFileRef
       previewImageUrl
       processingHistory {
-        status
-        timestamp
-        workerName
-        errorMessage
+        fppId # Added
+        batchId # Added
+        overallPipelineStatus # Added
+        perkeepUploadStatus # Added
+        ocrAnalysisStatus # Added
+        ocr2VectorDBStatus # Added
+        vectorDB2AnalyticsStatus # Added
+        lastUpdatedTimestamp # Added
       }
       userTags
       relatedDocuments {
@@ -58,27 +65,37 @@ export const getFileDetails = gql`
       }
       structuredData {
         ... on ContractData {
-          contractId
-          contractType
-          effectiveDate
-          expirationDate
+          contractNumber # Renamed from contractId
+          contractName # Renamed from contractType
           partyA
           partyB
+          totalAmount # Added
+          currency # Added
+          effectiveDate
+          expirationDate
         }
         ... on InvoiceData {
           invoiceNumber
-          invoiceDate
-          dueDate
+          invoiceCode # Added
+          invoiceType # Added
+          issuerName # Renamed from vendorName
+          recipientName # Renamed from customerName
           totalAmount
-          vendorName
-          customerName
+          taxAmount # Added
+          amountExcludingTax # Added
+          invoiceDate
+          lineItemsJson # Added
         }
         ... on BankSlipData {
-          slipId
-          paymentDate
-          amount
           payerName
-          receiverName
+          payerAccount # Added
+          payerBank # Added
+          payeeName # Renamed from receiverName
+          payeeAccount # Added
+          payeeBank # Added
+          paymentAmount # Renamed from amount
+          paymentDate
+          remarks # Added
         }
       }
     }

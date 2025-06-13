@@ -4,12 +4,12 @@ import React, { useState } from "react";
 import { DialogLayout } from "@/ui/layouts/DialogLayout";
 import { FeatherFile, FeatherClock, FeatherCheck, FeatherDownloadCloud, FeatherX, FeatherChevronLeft, FeatherChevronRight, FeatherEdit, FeatherPlus } from "@subframe/core";
 import { Badge } from "@/ui/components/Badge";
-import { getStatusBadge } from "@/components/common/FileList";
+import { getStatusBadge, getFileIcon } from "@/components/common/FileList"; // Added getFileIcon
 import { Button } from "@/ui/components/Button";
 import { IconButton } from "@/ui/components/IconButton";
 import { Select } from "@/ui/components/Select";
 import { TextField } from "@/ui/components/TextField";
-import { FilePreviewDialogProps } from "@/types/file";
+import { FilePreviewDialogProps, InvoiceData, ContractData, BankSlipData } from "@/types/file"; // Added imports
 
 function FilePreviewDialog({ open, onOpenChange, file }: FilePreviewDialogProps) {
   const [currentPage, setCurrentPage] = useState(1);
@@ -33,15 +33,15 @@ function FilePreviewDialog({ open, onOpenChange, file }: FilePreviewDialogProps)
         <div className="flex w-full items-center justify-between rounded-md bg-neutral-50 px-6 py-4">
           <div className="flex grow shrink-0 basis-0 items-center gap-4">
             <div className="flex items-center gap-2">
-              <FeatherFile className="text-body font-body text-neutral-500" />
+              {getFileIcon(file.fileType || 'OTHER')}
               <span className="text-heading-3 font-heading-3 text-default-font">
-                {file.name}
+                {file.fileName}
               </span>
             </div>
             <Badge variant="neutral" icon={<FeatherClock />}>
-              {file.uploadTime}
+              {file.uploadTimestamp}
             </Badge>
-            {getStatusBadge(file.status)}
+            {getStatusBadge(file.processingStatus)}
           </div>
           <div className="flex items-center gap-2">
             <Button
@@ -64,8 +64,8 @@ function FilePreviewDialog({ open, onOpenChange, file }: FilePreviewDialogProps)
               <div className="flex w-full grow shrink-0 basis-0 flex-col items-center justify-center gap-6 bg-default-background px-12 py-12">
                 <img
                   className="flex-none rounded-sm"
-                  src={file.previewUrl}
-                  alt={file.name}
+                  src={file.previewImageUrl}
+                  alt={file.fileName}
                 />
               </div>
               <div className="flex w-full flex-wrap items-center justify-center gap-4 border-b border-solid border-neutral-border bg-neutral-50 px-4 py-3">
@@ -118,7 +118,7 @@ function FilePreviewDialog({ open, onOpenChange, file }: FilePreviewDialogProps)
                 label=""
                 placeholder="Select"
                 helpText=""
-                value={file.type}
+                value={file.documentType || ""} // Changed to documentType
                 onValueChange={(value: string) => {}}
               >
                 <Select.Item value="pdf">PDF</Select.Item>
@@ -131,40 +131,48 @@ function FilePreviewDialog({ open, onOpenChange, file }: FilePreviewDialogProps)
                 结构化信息
               </span>
               <div className="flex w-full flex-col items-start gap-4">
-                <TextField
-                  className="h-auto w-full flex-none"
-                  disabled={true}
-                  label="纳税人姓名"
-                  helpText=""
-                >
-                  <TextField.Input
-                    placeholder="张三"
-                    value={file.structuredInfo?.taxpayerName || ""}
-                    onChange={() => {}}
-                  />
-                </TextField>
-                <TextField
-                  className="h-auto w-full flex-none"
-                  label="身份证号"
-                  helpText=""
-                >
-                  <TextField.Input
-                    placeholder="110101199001011234"
-                    value={file.structuredInfo?.idNumber || ""}
-                    onChange={() => {}}
-                  />
-                </TextField>
-                <TextField
-                  className="h-auto w-full flex-none"
-                  label="纳税年度"
-                  helpText=""
-                >
-                  <TextField.Input
-                    placeholder="2023"
-                    value={file.structuredInfo?.taxYear || ""}
-                    onChange={() => {}}
-                  />
-                </TextField>
+                {file.structuredData?.__typename === 'InvoiceData' && (
+                  <>
+                    <TextField label="Invoice Number" disabled={true} className="w-full">
+                      <TextField.Input value={(file.structuredData as InvoiceData).invoiceNumber || ""} readOnly={true} />
+                    </TextField>
+                    <TextField label="Issuer Name" disabled={true} className="w-full">
+                      <TextField.Input value={(file.structuredData as InvoiceData).issuerName || ""} readOnly={true} />
+                    </TextField>
+                    <TextField label="Total Amount" disabled={true} className="w-full">
+                      <TextField.Input value={(file.structuredData as InvoiceData).totalAmount?.toString() || ""} readOnly={true} />
+                    </TextField>
+                  </>
+                )}
+                {file.structuredData?.__typename === 'ContractData' && (
+                  <>
+                    <TextField label="Contract Name" disabled={true} className="w-full">
+                      <TextField.Input value={(file.structuredData as ContractData).contractName || ""} readOnly={true} />
+                    </TextField>
+                    <TextField label="Party A" disabled={true} className="w-full">
+                      <TextField.Input value={(file.structuredData as ContractData).partyA || ""} readOnly={true} />
+                    </TextField>
+                    <TextField label="Total Amount" disabled={true} className="w-full">
+                      <TextField.Input value={(file.structuredData as ContractData).totalAmount?.toString() || ""} readOnly={true} />
+                    </TextField>
+                  </>
+                )}
+                {file.structuredData?.__typename === 'BankSlipData' && (
+                  <>
+                    <TextField label="Payer Name" disabled={true} className="w-full">
+                      <TextField.Input value={(file.structuredData as BankSlipData).payerName || ""} readOnly={true} />
+                    </TextField>
+                    <TextField label="Payee Name" disabled={true} className="w-full">
+                      <TextField.Input value={(file.structuredData as BankSlipData).payeeName || ""} readOnly={true} />
+                    </TextField>
+                    <TextField label="Payment Amount" disabled={true} className="w-full">
+                      <TextField.Input value={(file.structuredData as BankSlipData).paymentAmount?.toString() || ""} readOnly={true} />
+                    </TextField>
+                  </>
+                )}
+                {!file.structuredData || !['InvoiceData', 'ContractData', 'BankSlipData'].includes(file.structuredData?.__typename || "") && (
+                  <p className="text-body font-body text-subtext-color">No specific structured data preview available for this document type.</p>
+                )}
               </div>
             </div>
             <div className="flex w-full flex-col items-start gap-4">
@@ -172,7 +180,7 @@ function FilePreviewDialog({ open, onOpenChange, file }: FilePreviewDialogProps)
                 标签管理
               </span>
               <div className="flex w-full flex-wrap items-start gap-2">
-                {file.tags?.map((tag, index) => (
+                {file.userTags?.map((tag, index) => (
                   <Badge key={index} className="rounded-sm" variant="neutral">
                     {tag}
                   </Badge>

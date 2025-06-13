@@ -3,12 +3,12 @@ import { Table } from '@/ui/components/Table';
 import { Button } from '@/ui/components/Button';
 import { FeatherEye, FeatherDownloadCloud } from '@subframe/core';
 import { useLazyQuery } from '@apollo/client';
-import { QUERY_FILE_DETAILS } from '@/lib/graphql/file-queries';
+import { getFileDetails } from '@/lib/graphql/file-queries';
 import FilePreviewDialog from './FilePreviewDialog';
-import { FileInfo } from "@/types/file";
+import { FileListItemView, FileDetailView } from "@/types/file"; // Changed FileInfo to FileListItemView
 
 interface FileListProps {
-  files: FileInfo[];
+  files: FileListItemView[]; // Changed FileInfo to FileListItemView
   onView: (fileId: string) => void;
   onDownload: (fileId: string) => void;
 }
@@ -24,7 +24,7 @@ import {
 } from '@subframe/core';
 import { Badge } from '@/ui/components/Badge';
 
-export const getFileIcon = (type: FileInfo['fileType']) => { // Changed type to fileType
+export const getFileIcon = (type: FileListItemView['fileType']) => { // Changed FileInfo to FileListItemView
   switch (type) {
     case 'PDF':
     case 'DOCX':
@@ -39,7 +39,7 @@ export const getFileIcon = (type: FileInfo['fileType']) => { // Changed type to 
   }
 };
 
-export const getStatusBadge = (status: FileInfo['processingStatus']) => { // Changed status to processingStatus
+export const getStatusBadge = (status: FileListItemView['processingStatus']) => { // Changed FileInfo to FileListItemView
   switch (status) {
     case 'COMPLETED':
       return (
@@ -67,26 +67,45 @@ export const getStatusBadge = (status: FileInfo['processingStatus']) => { // Cha
 };
 
 const FileList: React.FC<FileListProps> = ({ files, onView, onDownload }) => {
-  const [selectedFile, setSelectedFile] = useState<FileInfo | null>(null);
+  const [selectedFile, setSelectedFile] = useState<FileDetailView | null>(null); // Changed type here
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
-  const [getFileDetails, { loading: loadingDetails }] = useLazyQuery(QUERY_FILE_DETAILS);
+  const [fetchFileDetailsForPreview, { loading: loadingDetails }] = useLazyQuery(getFileDetails);
 
-  const handleView = async (file: FileInfo) => {
+  const handleView = async (fileItem: FileListItemView) => { // Changed FileInfo to FileListItemView
     try {
-      const { data } = await getFileDetails({ variables: { id: file.id } });
-      if (data && data.file) {
-        setSelectedFile(data.file);
-      } else {
-        setSelectedFile(file);
+      // Fetch full details
+      const { data, error: queryError } = await fetchFileDetailsForPreview({ variables: { id: fileItem.id } });
+
+      if (queryError) {
+        console.error('获取文件详情失败 (queryError):', queryError.message);
+        setIsPreviewOpen(false);
+        setSelectedFile(null);
+        // Optionally: notify user via toast or inline message
+        if (onView) onView(fileItem.id); // Still call onView to indicate an attempt was made
+        return;
       }
-      setIsPreviewOpen(true);
-    } catch (error) {
-      console.error('获取文件详情失败:', error);
-      setSelectedFile(file);
-      setIsPreviewOpen(true);
+
+      if (data && data.getFileDetails) {
+        setSelectedFile(data.getFileDetails);
+        setIsPreviewOpen(true);
+      } else {
+        console.warn('获取文件详情未返回数据 for ID:', fileItem.id);
+        setIsPreviewOpen(false);
+        setSelectedFile(null);
+        // Optionally: notify user
+      }
+    } catch (error) { // Catch network or other unexpected errors during the async operation
+      console.error('获取文件详情时发生异常:', error);
+      setIsPreviewOpen(false);
+      setSelectedFile(null);
+      // Optionally: notify user
     }
+
+    // Call onView callback if provided, regardless of success, to indicate interaction
+    // Or, only call it on successful preview open, depending on desired UX.
+    // For now, calling it to signify an attempt.
     if (onView) {
-      onView(file.id);
+      onView(fileItem.id);
     }
   };
 

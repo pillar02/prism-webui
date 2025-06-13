@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { FileInfo, FileDetailView, FileProcessingStatusView, ContractData, InvoiceData, BankSlipData, StructuredDataUnion } from '@/types/file'; // Assuming these types are now defined in types/file.ts
+// Fix 1: Added FileListItemView to imports - Now removing FileInfo
+import { FileDetailView, FileListItemView, FileProcessingStatusView, ContractData, InvoiceData, BankSlipData, StructuredDataUnion } from '@/types/file';
 import { buildSchema, graphql } from 'graphql';
 
 // Define a more comprehensive type for our mock data store
@@ -16,8 +17,8 @@ interface MockFileMasterData {
   perkeepFileRef?: string;
   previewImageUrl?: string;
   processingHistory?: FileProcessingStatusView;
-  relatedDocuments?: Partial<FileListItemView>[]; // Simplified related docs for mocking
-  structuredData?: ( (ContractData | InvoiceData | BankSlipData) & { __typename: string } ); // Ensure __typename for union
+  relatedDocuments?: Partial<FileListItemView>[];
+  structuredData?: StructuredDataUnion; // Fix 2: Changed this line
   // Optional original fields if needed for other logic, though try to phase out
   size?: string;
   uploader?: string;
@@ -71,7 +72,7 @@ const mockMasterData: MockFileMasterData[] = [
     relatedDocuments: [sampleRelatedDocs[0]],
     structuredData: {
       __typename: 'InvoiceData', // Example: Treat as Invoice for mocking, adjust as needed
-      id: '101-inv', invoiceNumber: 'INV-FS-2023-001', totalAmount: 50000, currency: 'CNY', invoiceDate: '2023-12-31T00:00:00Z', issuerName: '公司财务部'
+      invoiceNumber: 'INV-FS-2023-001', totalAmount: 50000, invoiceDate: '2023-12-31T00:00:00Z', issuerName: '公司财务部'
     },
     size: '2.5 MB', uploader: '张三'
   },
@@ -96,7 +97,7 @@ const mockMasterData: MockFileMasterData[] = [
     relatedDocuments: [sampleRelatedDocs[1]],
     structuredData: {
       __typename: 'ContractData',
-      id: '102-contract', contractNumber: 'MKT-PLAN-Q3-2024', contractName: 'Q3 Marketing Plan Agreement', partyA: '营销部', partyB: '销售部', totalAmount: 150000, currency: 'CNY', effectiveDate: '2024-07-01T00:00:00Z', expirationDate: '2024-09-30T00:00:00Z'
+      contractNumber: 'MKT-PLAN-Q3-2024', contractName: 'Q3 Marketing Plan Agreement', partyA: '营销部', partyB: '销售部', totalAmount: 150000, currency: 'CNY', effectiveDate: '2024-07-01T00:00:00Z', expirationDate: '2024-09-30T00:00:00Z'
     },
     size: '1.2 MB', uploader: '李四'
   },
@@ -143,7 +144,7 @@ const mockMasterData: MockFileMasterData[] = [
     relatedDocuments: [sampleRelatedDocs[0], sampleRelatedDocs[1]],
     structuredData: {
       __typename: 'ContractData',
-      id: '104-contract', contractNumber: 'CUST-ABC-2024-001', contractName: 'Service Agreement with ABC Corp', partyA: '我方公司', partyB: 'ABC 公司', totalAmount: 250000, currency: 'USD', effectiveDate: '2024-07-10T00:00:00Z', expirationDate: '2025-07-09T00:00:00Z'
+      contractNumber: 'CUST-ABC-2024-001', contractName: 'Service Agreement with ABC Corp', partyA: '我方公司', partyB: 'ABC 公司', totalAmount: 250000, currency: 'USD', effectiveDate: '2024-07-10T00:00:00Z', expirationDate: '2025-07-09T00:00:00Z'
     },
     size: '800 KB', uploader: '赵六'
   },
@@ -191,7 +192,7 @@ const mockMasterData: MockFileMasterData[] = [
     relatedDocuments: [sampleRelatedDocs[0]],
     structuredData: {
         __typename: 'ContractData', // Example, could be other type or undefined
-        id: '106-hrplan', contractNumber: 'HR-PLAN-2024', contractName: '2024 HR Strategic Plan', partyA: 'HR Department', totalAmount: 0, currency: 'N/A', effectiveDate: '2024-01-01T00:00:00Z'
+        contractNumber: 'HR-PLAN-2024', contractName: '2024 HR Strategic Plan', partyA: 'HR Department', totalAmount: 0, currency: 'N/A', effectiveDate: '2024-01-01T00:00:00Z'
     },
     size: '1.8 MB', uploader: '周八'
   },
@@ -216,7 +217,7 @@ const mockMasterData: MockFileMasterData[] = [
     relatedDocuments: [sampleRelatedDocs[1]],
     structuredData: {
       __typename: 'BankSlipData',
-      id: '109-bankslip', payerName: '我方公司', payerAccount: '1234567890', payerBank: '招商银行', payeeName: 'XYZ 供应商', payeeAccount: '0987654321', payeeBank: '工商银行', paymentAmount: 85000, paymentDate: '2024-07-05T00:00:00Z', remarks: '支付货款'
+      payerName: '我方公司', payerAccount: '1234567890', payerBank: '招商银行', payeeName: 'XYZ 供应商', payeeAccount: '0987654321', payeeBank: '工商银行', paymentAmount: 85000, paymentDate: '2024-07-05T00:00:00Z', remarks: '支付货款'
     },
     size: '1.6 MB', uploader: '陈十一'
   },
@@ -241,7 +242,7 @@ const mockMasterData: MockFileMasterData[] = [
     relatedDocuments: [],
     structuredData: {
       __typename: 'InvoiceData',
-      id: '110-invoice', invoiceNumber: 'INV-CONS-A-005', invoiceCode: 'IC123456', invoiceType: '服务费', issuerName: '顾问A公司', recipientName: '我方公司', totalAmount: 12000, taxAmount: 720, amountExcludingTax: 11280, invoiceDate: '2024-07-01T00:00:00Z'
+      invoiceNumber: 'INV-CONS-A-005', invoiceCode: 'IC123456', invoiceType: '服务费', issuerName: '顾问A公司', recipientName: '我方公司', totalAmount: 12000, taxAmount: 720, amountExcludingTax: 11280, invoiceDate: '2024-07-01T00:00:00Z'
     },
     size: '5.7 MB', uploader: '林十二'
   }
@@ -269,8 +270,7 @@ interface BaseData {
   id: ID!
 }
 
-type ContractData implements BaseData {
-  id: ID!
+type ContractData {
   contractNumber: String
   contractName: String
   partyA: String
@@ -281,8 +281,7 @@ type ContractData implements BaseData {
   expirationDate: String # Consider using DateTime scalar
 }
 
-type InvoiceData implements BaseData {
-  id: ID!
+type InvoiceData {
   invoiceNumber: String
   invoiceCode: String
   invoiceType: String
@@ -295,8 +294,7 @@ type InvoiceData implements BaseData {
   lineItemsJson: String # JSON string for line items
 }
 
-type BankSlipData implements BaseData {
-  id: ID!
+type BankSlipData {
   payerName: String
   payerAccount: String
   payerBank: String
@@ -337,12 +335,15 @@ type FileDetailView {
   id: ID!
   fileName: String
   documentType: String
+  fileType: String # Added this line
   perkeepFileRef: String # Perkeep blob reference
   previewImageUrl: String
   processingHistory: FileProcessingStatusView # Or [FileProcessingStatusView!] if multiple history entries
   userTags: [String!]
   relatedDocuments: [FileListItemView!]
   structuredData: StructuredDataUnion
+  uploadTimestamp: String!       # Added
+  processingStatus: PipelineStageStatus! # Added
 }
 
 input FileFilterInput {
@@ -479,15 +480,15 @@ const rootValue = {
       id: file.id,
       fileName: file.fileName,
       documentType: file.documentType,
+      fileType: file.fileType, // Added this line
       perkeepFileRef: file.perkeepFileRef,
       previewImageUrl: file.previewImageUrl,
-      processingHistory: file.processingHistory, // Assuming direct match or further mapping if needed
+      processingHistory: file.processingHistory,
       userTags: file.userTags || [],
       relatedDocuments: relatedDocsView,
-      structuredData: file.structuredData ? {
-        __typename: file.structuredData.__typename, // Crucial for union type
-        ...file.structuredData // Spread the rest of the data
-      } : undefined,
+      structuredData: file.structuredData, // Fix 3: Simplified this line
+      uploadTimestamp: file.uploadTimestamp,
+      processingStatus: file.processingStatus,
     };
   },
 };
