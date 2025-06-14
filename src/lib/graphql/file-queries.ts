@@ -30,6 +30,24 @@ export const searchFiles = gql`
   }
 `;
 
+export const getUploadActivity = gql`
+  query getUploadActivity(
+    $from: String
+    $to: String
+    $userId: String
+  ) {
+    getUploadActivity(
+      from: $from
+      to: $to
+      userId: $userId
+    ) {
+      date
+      count
+      level
+    }
+  }
+`;
+
 export const getFileDetails = gql`
   query getFileDetails($id: ID!) {
     getFileDetails(id: $id) { # Changed root operation

@@ -366,6 +366,18 @@ type Query {
   ): [FileListItemView!]!
 
   getFileDetails(id: ID!): FileDetailView
+
+  getUploadActivity(
+    from: String
+    to: String
+    userId: String
+  ): [DailyUploadActivity!]!
+}
+
+type DailyUploadActivity {
+  date: String!
+  count: Int!
+  level: Int!
 }
 `;
 
@@ -490,6 +502,36 @@ const rootValue = {
       uploadTimestamp: file.uploadTimestamp,
       processingStatus: file.processingStatus,
     };
+  },
+
+  getUploadActivity: ({ from, to, userId }: { from?: string; to?: string; userId?: string }) => {
+    const activities: { date: string; count: number; level: number }[] = [];
+    const endDate = to ? new Date(to) : new Date();
+    const startDate = from ? new Date(from) : new Date(new Date().setDate(endDate.getDate() - 365)); // Default to one year back
+
+    let currentDate = new Date(startDate);
+
+    while (currentDate <= endDate) {
+      const dateStr = currentDate.toISOString().split('T')[0];
+      const count = Math.floor(Math.random() * 101); // 0 to 100 uploads
+      let level = 0;
+      if (count > 60) level = 4;
+      else if (count > 30) level = 3;
+      else if (count > 10) level = 2;
+      else if (count > 0) level = 1;
+
+      activities.push({
+        date: dateStr,
+        count,
+        level,
+      });
+      currentDate.setDate(currentDate.getDate() + 1);
+    }
+    // If from and to are provided, the loop already respects them.
+    // If only from is provided, it goes from 'from' to today.
+    // If only to is provided, it goes from 1 year before 'to' up to 'to'.
+    // If neither, it's the last 365 days from today.
+    return activities;
   },
 };
 // --- End Inserted GraphQL Setup ---

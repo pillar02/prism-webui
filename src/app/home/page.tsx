@@ -17,49 +17,38 @@ import { FeatherHardDrive } from "@subframe/core";
 import { FeatherAlertTriangle } from "@subframe/core";
 import FileUploadDialog from "@/components/common/FileUploadDialog";
 import FileList from "@/components/common/FileList";
-import ActivityCalendar, { type ThemeInput, type Activity } from 'react-activity-calendar';
+import ActivityCalendar, { type ThemeInput, type Activity, Block } from 'react-activity-calendar';
 import { FileInfo } from '@/types/file'; // Assuming FileInfo will be updated or is flexible
 import { useQuery } from "@apollo/client";
-import { searchFiles } from '@/lib/graphql/file-queries'; // Changed import
+import { searchFiles, getUploadActivity } from '@/lib/graphql/file-queries'; // Changed import
 
 function Dashboard() {
-  const numRecentFiles = 5
+  const numRecentFiles = 5;
   const router = useRouter();
   const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
-  const { loading, error, data } = useQuery(searchFiles, { // Changed query
-    variables: { limit: numRecentFiles }, // Changed variable name
-  });
-  const [activityData, setActivityData] = useState<Activity[]>(() => {
-    const today = new Date();
-    const year = today.getFullYear();
-    const data: Activity[] = [];
-    // Generate data for the current year
-    for (let i = 0; i < 366; i++) {
-      const date = new Date(year, 0, 1 + i);
-      // Ensure we don't go past the current year if it's a leap year and we generated 366 days
-      if (date.getFullYear() !== year) continue;
 
-      const count = Math.floor(Math.random() * 10);
-      let level = 0;
-      if (count > 0 && count <= 2) {
-        level = 1;
-      } else if (count > 2 && count <= 5) {
-        level = 2;
-      } else if (count > 5 && count <= 8) {
-        level = 3;
-      } else if (count > 8) {
-        level = 4;
-      }
-      data.push({
-        date: date.toISOString().slice(0, 10),
-        count: count,
-        level: level as 0 | 1 | 2 | 3 | 4,
-      });
+  // Query for recent files
+  const { loading: recentFilesLoading, error: recentFilesError, data: recentFilesData } = useQuery(searchFiles, {
+    variables: { limit: numRecentFiles },
+  });
+
+  // Query for activity data
+  const { loading: activityLoading, error: activityError, data: rawActivityData } = useQuery(getUploadActivity);
+
+  const [activityData, setActivityData] = useState<Activity[]>([]);
+
+  useEffect(() => {
+    if (rawActivityData && rawActivityData.getUploadActivity) {
+      // Ensure level is within the 0-4 range if not already
+      const processedData = rawActivityData.getUploadActivity.map((activity: any) => ({
+        ...activity,
+        level: Math.min(Math.max(activity.level, 0), 4) as 0 | 1 | 2 | 3 | 4,
+      }));
+      setActivityData(processedData);
     }
-    return data;
-  });
+  }, [rawActivityData]);
 
-  const recentFilesToDisplay = data?.searchFiles || []; // Adjusted data extraction
+  const recentFilesToDisplay = recentFilesData?.searchFiles || []; // Adjusted data extraction
 
   const explicitTheme: ThemeInput = {
     light: [
@@ -158,27 +147,62 @@ function Dashboard() {
           </span>
           <div className="flex w-full flex-col items-start gap-4 rounded-md bg-neutral-50 px-6 py-6">
             <div className="w-full overflow-x-auto"> {/* Added flex justify-center for centering if content is narrower than container, and pt-6 for padding */}
-              <ActivityCalendar
-                data={activityData}
-                theme={explicitTheme}
-                colorScheme="light"
-                blockSize={14}
-                blockRadius={20}
-                fontSize={16}
-                labels={{
-                  totalCount: '{{year}} 年共上传 {{count}} 份文件',
-                  legend: {
-                    less: '更少',
-                    more: '更多',
-                  },
-                  months: ['一月', '二月', '三月', '四月', '五月', '六月', '七月', '八月', '九月', '十月', '十一月', '十二月'],
-                  // weekdays: ['周日', '周一', '周二', '周三', '周四', '周五', '周六'],
-                }}
-              />
+              {activityLoading && (
+                <div className="flex items-center justify-center w-full h-32"> {/* Adjust height as needed */}
+                  <Loader className="text-brand-600 h-6 w-6" />
+                  <span className="ml-2 text-body font-body text-subtext-color">正在加载活动日历...</span>
+                </div>
+              )}
+              {activityError && (
+                <div className="flex items-center justify-center w-full h-32"> {/* Adjust height as needed */}
+                  <FeatherAlertTriangle className="text-error-600 h-6 w-6" />
+                  <span className="ml-2 text-body font-body text-subtext-color">获取活动日历失败: {activityError.message}</span>
+                </div>
+              )}
+              {!activityLoading && !activityError && activityData.length > 0 && (
+                <ActivityCalendar
+                  data={activityData}
+                  theme={explicitTheme}
+                  colorScheme="light"
+                  blockSize={14}
+                  blockRadius={20} // Note: blockRadius was 20, but react-activity-calendar uses `blockRadius` for border-radius of blocks, typical values are 2 or 4.
+                                   // If this was intended for spacing or some other visual effect, it might need adjustment.
+                                   // For now, I'll keep it as is, assuming it was a deliberate choice.
+                  fontSize={16}
+                  renderBlock={(block, activity) => (
+                    <div title={`Date: ${activity.date} - Count: ${activity.count}`}>
+                      {block}
+                    </div>
+                  )}
+                  eventHandlers={{
+                    onClick: (event) => (activity) => {
+                      console.log('Activity clicked:', activity);
+                    }
+                  }}
+                  labels={{
+                    totalCount: '{{year}} 年共上传 {{count}} 份文件',
+                    legend: {
+                      less: '更少',
+                      more: '更多',
+                    },
+                    months: ['一月', '二月', '三月', '四月', '五月', '六月', '七月', '八月', '九月', '十月', '十一月', '十二月'],
+                    // weekdays: ['周日', '周一', '周二', '周三', '周四', '周五', '周六'],
+                  }}
+                />
+              )}
+              {!activityLoading && !activityError && activityData.length === 0 && !rawActivityData?.getUploadActivity && (
+                 <div className="flex items-center justify-center w-full h-32"> {/* Adjust height as needed */}
+                  <FeatherAlertTriangle className="text-warning-600 h-6 w-6" />
+                  <span className="ml-2 text-body font-body text-subtext-color">暂无活动数据。</span>
+                </div>
+              )}
             </div>
           </div>
         </div>
         <div className="flex w-full flex-col items-start gap-4">
+                theme={explicitTheme}
+                colorScheme="light"
+                blockSize={14}
           <div className="flex w-full items-center gap-2">
             <span className="grow shrink-0 basis-0 text-heading-3 font-heading-3 text-default-font">
               最近上传
@@ -205,10 +229,10 @@ function Dashboard() {
               <Loader className="text-brand-600 h-8 w-8" />
               <span className="ml-2 text-body font-body text-subtext-color">正在加载最近文件...</span>
             </div>
-          ) : error ? (
+        ) : recentFilesError ? (
              <div className="flex items-center justify-center w-full h-48">
               <FeatherAlertTriangle className="text-error-600 h-8 w-8" />
-              <span className="ml-2 text-body font-body text-subtext-color">获取最近文件失败: {error.message}</span>
+            <span className="ml-2 text-body font-body text-subtext-color">获取最近文件失败: {recentFilesError.message}</span>
             </div>
           ) : recentFilesToDisplay.length > 0 ? (
             <FileList files={recentFilesToDisplay} onView={() => {}} onDownload={() => {}} />
